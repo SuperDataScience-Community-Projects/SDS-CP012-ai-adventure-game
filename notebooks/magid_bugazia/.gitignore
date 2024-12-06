@@ -1,0 +1,13 @@
+
+.env               
+.ipynb_checkpoints    
+.DS_Store          
+.venv                
+.idea                
+
+__pycache__/        
+.vscode/            
+test.ipynb   
+
+.DS_Store           
+*.pyc              
