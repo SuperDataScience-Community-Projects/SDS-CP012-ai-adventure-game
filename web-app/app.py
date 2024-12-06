@@ -29,12 +29,8 @@ st.set_page_config(
 # Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []  
-if "game_engine" not in st.session_state:
-    config = ChatConfig(
-        provider=ChatProvider.OPENAI,
-        max_history=10
-    )
-    st.session_state.game_engine = GameEngine(config)
+if "openai_api_key" not in st.session_state:
+    st.session_state.openai_api_key = None
 if "game_active" not in st.session_state:
     st.session_state.game_active = False
 
@@ -60,26 +56,44 @@ st.markdown("""
 # Header
 st.title("🎮 AI Text Adventure Game")
 
-# Sidebar with game controls
+# Sidebar with game controls and API key input
 with st.sidebar:
     st.header("Game Controls")
-    if st.button("New Game"):
-        logging.debug("=== Starting New Game ===")
-        # Reset game engine with fresh config
-        config = ChatConfig(
-            provider=ChatProvider.OPENAI,
-            max_history=30
-        )
-        st.session_state.game_engine = GameEngine(config)
-        
-        # Initialize game to show character options only
-        game_init = st.session_state.game_engine.initialize_game()
-        
-        # Reset UI state and show only the character selection prompt
-        st.session_state.messages = [
-            AIMessage(content=game_init["options"])
-        ]
-        st.session_state.game_active = True
+
+    # Add welcome message
+    st.markdown("""
+    Welcome to this game, let an AI be your storyteller! 
+    While you'll see options in each message, feel free to respond however you want - 
+    your adventure, your choices! 🎲✨
+    """)
+    
+    # Add API key input
+    api_key = st.text_input("Enter your OpenAI API key:", type="password")
+    if api_key:
+        st.session_state.openai_api_key = api_key
+    
+    # Only show New Game button if API key is provided
+    if st.session_state.openai_api_key:
+        if st.button("New Game"):
+            logging.debug("=== Starting New Game ===")
+            # Initialize game engine with API key
+            config = ChatConfig(
+                provider=ChatProvider.OPENAI,
+                max_history=30,
+                api_key=st.session_state.openai_api_key
+            )
+            st.session_state.game_engine = GameEngine(config)
+            
+            # Initialize game to show character options only
+            game_init = st.session_state.game_engine.initialize_game()
+            
+            # Reset UI state and show only the character selection prompt
+            st.session_state.messages = [
+                AIMessage(content=game_init["options"])
+            ]
+            st.session_state.game_active = True
+    else:
+        st.info("Please enter your OpenAI API key to start the game.")
 
 # Message display area
 message_container = st.container()
@@ -95,7 +109,7 @@ with message_container:
             """, unsafe_allow_html=True)
 
 # Game input form
-if st.session_state.game_active:
+if st.session_state.game_active and "game_engine" in st.session_state:
     with st.form(key="user_input_form", clear_on_submit=True):
         user_input = st.text_input("Your response:")
         submit = st.form_submit_button("Send")
