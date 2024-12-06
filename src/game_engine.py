@@ -40,6 +40,22 @@ class GameEngine:
             logging.error(f"Prompt file not found: {path}")
             raise
 
+    def _format_conversation_history(self, skip_system: bool = True, start_idx: int = 1) -> str:
+        """Format conversation history into a string.
+        
+        Args:
+            skip_system: Whether to skip the system message (default: True)
+            start_idx: Starting index for messages to include (default: 1)
+            
+        Returns:
+            Formatted conversation history string
+        """
+        messages_to_format = self.messages[start_idx:] if skip_system else self.messages
+        return "\n".join([
+            f"{'User' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content}"
+            for msg in messages_to_format
+        ])
+
     def initialize_game(self, character_selection: Optional[str] = None):
         """Setup initial game state and prompts"""
         # Get character options using the character chain
@@ -60,7 +76,6 @@ class GameEngine:
             }
         
         # Always add the character selection to messages
-        logging.debug(f"Character selected: {character_selection}")
         self.messages.extend([
             HumanMessage(content=character_selection)
         ])
@@ -70,12 +85,9 @@ class GameEngine:
         if character_selection != "Start the adventure!":
             # Add start command and generate initial story
             self.messages.append(HumanMessage(content="Start the adventure with the selected character and setting!"))
-
-            # Format conversation history to include character options and selection
-            history = "\n".join([
-                f"{'User' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content}"
-                    for msg in self.messages[1:-1]  # Include everything except system message and latest command
-            ])
+            
+            # Use the new utility method
+            history = self._format_conversation_history(start_idx=1)  # Skip system message
             
             # Generate initial story response
             initial_story = self.story_chain.invoke({
@@ -101,14 +113,9 @@ class GameEngine:
             # Add user input to messages
             self.messages.append(HumanMessage(content=user_input))
 
-            # Format conversation history - Include everything except system message
-            history = "\n".join([
-                f"{'User' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content}"
-                for msg in self.messages[1:]  # Only skip system message
-            ])
-
-            print(f"History: {history}")
-            
+            # Use the new utility method
+            history = self._format_conversation_history(skip_system=True)
+                        
             # Generate story continuation with history
             story_text = self.story_chain.invoke({
                 "history": history,

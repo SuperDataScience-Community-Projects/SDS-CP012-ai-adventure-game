@@ -19,3 +19,6 @@ test.ipynb
 # log files
 *.log
 
+# messages.json
+messages.json
+
