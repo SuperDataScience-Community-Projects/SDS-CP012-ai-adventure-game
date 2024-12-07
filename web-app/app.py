@@ -32,7 +32,7 @@ if "messages" not in st.session_state:
 if "game_engine" not in st.session_state:
     config = ChatConfig(
         provider=ChatProvider.OPENAI,
-        max_history=6
+        max_history=10
     )
     st.session_state.game_engine = GameEngine(config)
 if "game_active" not in st.session_state:

@@ -5,6 +5,7 @@ from langchain_core.output_parsers import StrOutputParser
 from pathlib import Path
 import logging
 from .config import ChatConfig
+import json
 
 class GameEngine:
     def __init__(self, config: ChatConfig):
@@ -27,7 +28,7 @@ class GameEngine:
         # Story continuation chain
         story_prompt = ChatPromptTemplate.from_messages([
             ("system", self._load_prompt(self.config.system_prompt_path)),
-            ("human", "{user_input}")
+            ("human", "Previous conversation:\n{history}\n\nCurrent input:\n{user_input}")
         ])
         self.story_chain = story_prompt | self.storyteller | StrOutputParser()
 
@@ -58,16 +59,27 @@ class GameEngine:
                 "initial_story": ""
             }
         
+        # Always add the character selection to messages
+        logging.debug(f"Character selected: {character_selection}")
+        self.messages.extend([
+            HumanMessage(content=character_selection)
+        ])
+
+        
         # Only proceed with story generation if character_selection isn't "Start the adventure!"
         if character_selection != "Start the adventure!":
-            # Add character selection and start command to messages
-            self.messages.extend([
-                HumanMessage(content=character_selection),
-                HumanMessage(content="Start the adventure with the selected character and setting!")
+            # Add start command and generate initial story
+            self.messages.append(HumanMessage(content="Start the adventure with the selected character and setting!"))
+
+            # Format conversation history to include character options and selection
+            history = "\n".join([
+                f"{'User' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content}"
+                    for msg in self.messages[1:-1]  # Include everything except system message and latest command
             ])
             
             # Generate initial story response
             initial_story = self.story_chain.invoke({
+                "history": history,
                 "user_input": self.messages[-1].content
             })
             self.messages.append(AIMessage(content=initial_story))
@@ -88,9 +100,18 @@ class GameEngine:
         try:
             # Add user input to messages
             self.messages.append(HumanMessage(content=user_input))
+
+            # Format conversation history - Include everything except system message
+            history = "\n".join([
+                f"{'User' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content}"
+                for msg in self.messages[1:]  # Only skip system message
+            ])
+
+            print(f"History: {history}")
             
-            # Generate story continuation
+            # Generate story continuation with history
             story_text = self.story_chain.invoke({
+                "history": history,
                 "user_input": self.messages[-1].content
             })
             
@@ -99,7 +120,10 @@ class GameEngine:
             
             # Maintain conversation history
             if len(self.messages) > self.config.max_history:
-                self.messages = [self.messages[0]] + self.messages[-(self.config.max_history-1):]
+                # Keep system message and at least the character selection messages
+                min_messages_to_keep = 4  # system + character setup + selection + initial story
+                keep_count = max(min_messages_to_keep, self.config.max_history)
+                self.messages = [self.messages[0]] + self.messages[-keep_count:]
             
             return story_text
             
@@ -126,6 +150,10 @@ class GameEngine:
                 
                 if user_input.lower() == 'quit':
                     print("\nThanks for playing!")
+
+                    # save the messages to a file
+                    with open("messages.json", "w") as f:
+                        json.dump([{"content": message.content} for message in self.messages], f)
                     break
                 
                 # Process turn and display result
