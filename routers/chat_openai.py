@@ -11,6 +11,7 @@ class ChatOpenAIProvider(BaseChatProvider, ChatOpenAI):
         "gpt-4o-mini",
         "gpt-4o",
         "gpt-3.5-turbo",
+        "cloud-sambanova-llama-3-405b-instruct"
     ]
     
     def __init__(

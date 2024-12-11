@@ -32,6 +32,13 @@ class GameEngine:
         ])
         self.story_chain = story_prompt | self.storyteller | StrOutputParser()
 
+        # State extraction chain
+        state_prompt = ChatPromptTemplate.from_messages([
+            ("system", self._load_prompt(self.config.system_prompt_path)),
+            ("human", "{story_text} \n Extract the current state of the story.")
+        ])
+        self.state_chain = state_prompt | self.storyteller | StrOutputParser()
+
     def _load_prompt(self, path: str) -> str:
         """Load prompt from file"""
         try:
@@ -121,6 +128,13 @@ class GameEngine:
                 "history": history,
                 "user_input": self.messages[-1].content
             })
+            
+            # Extract the current state from the story text
+            current_state = self.state_chain.invoke({
+                "story_text": history + "\n\n" + story_text
+            })
+
+            print(f"\n#########################\nCurrent state: {current_state}\n#########################\n")
             
             # Add AI response to messages
             self.messages.append(AIMessage(content=story_text))

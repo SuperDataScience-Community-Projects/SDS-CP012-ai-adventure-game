@@ -5,6 +5,11 @@ from datetime import datetime
 from langchain_core.messages import AIMessage, HumanMessage
 import logging
 from typing import List
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging to write to a file
 logging.basicConfig(
@@ -33,6 +38,8 @@ if "openai_api_key" not in st.session_state:
     st.session_state.openai_api_key = None
 if "game_active" not in st.session_state:
     st.session_state.game_active = False
+if "use_free_version" not in st.session_state:
+    st.session_state.use_free_version = False
 
 # Custom CSS
 st.markdown("""
@@ -67,20 +74,29 @@ with st.sidebar:
     your adventure, your choices! 🎲✨
     """)
     
-    # Add API key input
-    api_key = st.text_input("Enter your OpenAI API key:", type="password")
-    if api_key:
-        st.session_state.openai_api_key = api_key
+    # Add toggle for free version
+    use_free_version = st.toggle("Use Free Version (Llama)", value=st.session_state.use_free_version)
+    st.session_state.use_free_version = use_free_version
     
-    # Only show New Game button if API key is provided
-    if st.session_state.openai_api_key:
+    # Modify API key input section
+    if not st.session_state.use_free_version:
+        api_key = st.text_input("Enter your OpenAI API key:", 
+                               value=os.getenv('OPENAI_API_KEY', ''),
+                               type="password")
+        if api_key:
+            st.session_state.openai_api_key = api_key
+    
+    # Modify New Game button condition
+    can_start_game = (st.session_state.use_free_version or st.session_state.openai_api_key)
+    if can_start_game:
         if st.button("New Game"):
             logging.debug("=== Starting New Game ===")
-            # Initialize game engine with API key
+            # Initialize game engine with appropriate config
             config = ChatConfig(
-                provider=ChatProvider.OPENAI,
+                provider=ChatProvider.LLAMA if st.session_state.use_free_version else ChatProvider.OPENAI,
                 max_history=30,
-                api_key=st.session_state.openai_api_key
+                api_key=None if st.session_state.use_free_version else st.session_state.openai_api_key,
+                base_url=os.getenv('PARASAIL_BASE_URL') if st.session_state.use_free_version else None
             )
             st.session_state.game_engine = GameEngine(config)
             
@@ -93,7 +109,7 @@ with st.sidebar:
             ]
             st.session_state.game_active = True
     else:
-        st.info("Please enter your OpenAI API key to start the game.")
+        st.info("Please either enable the free version or enter your OpenAI API key to start the game.")
 
 # Message display area
 message_container = st.container()
