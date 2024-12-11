@@ -12,6 +12,9 @@ class GameEngine:
         self.config = config
         self.messages: List[BaseMessage] = []
         self.storyteller = config.get_chat_provider()
+
+        # initialize state message
+        self.state_message = None
         
         # Initialize chains
         self._setup_chains()
@@ -28,7 +31,7 @@ class GameEngine:
         # Story continuation chain
         story_prompt = ChatPromptTemplate.from_messages([
             ("system", self._load_prompt(self.config.system_prompt_path)),
-            ("human", "Previous conversation:\n{history}\n\nCurrent input:\n{user_input}")
+            ("human", "Previous conversation:\n{history}\n\nCurrent state:\n{state_message}\n\nCurrent input:\n{user_input}")
         ])
         self.story_chain = story_prompt | self.storyteller | StrOutputParser()
 
@@ -99,6 +102,7 @@ class GameEngine:
             # Generate initial story response
             initial_story = self.story_chain.invoke({
                 "history": history,
+                "state_message": self.state_message,
                 "user_input": self.messages[-1].content
             })
             self.messages.append(AIMessage(content=initial_story))
@@ -126,6 +130,7 @@ class GameEngine:
             # Generate story continuation with history
             story_text = self.story_chain.invoke({
                 "history": history,
+                "state_message": self.state_message,
                 "user_input": self.messages[-1].content
             })
             
@@ -134,7 +139,10 @@ class GameEngine:
                 "story_text": history + "\n\n" + story_text
             })
 
-            print(f"\n#########################\nCurrent state: {current_state}\n#########################\n")
+            #print(f"\n#########################\nCurrent state: {current_state}\n#########################\n")
+            
+            # update state message
+            self.state_message = current_state
             
             # Add AI response to messages
             self.messages.append(AIMessage(content=story_text))
