@@ -39,6 +39,8 @@ class ChatConfig:
         self.max_history = max_history
         self.api_key = api_key
         self.base_url = base_url
+        self.input_tokens = 0
+        self.output_tokens = 0
 
     def get_api_key(self) -> SecretStr:
         """Get the appropriate API key based on provider"""
@@ -102,3 +104,17 @@ class ChatConfig:
             )
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
+
+    def get_token_costs(self) -> dict:
+        """Get the cost per 1K tokens for the current model"""
+        costs = {
+            ChatProvider.OPENAI: {
+                "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
+                "gpt-4o": {"input": 0.005, "output": 0.015},
+                "o1-mini": {"input": 0.003, "output": 0.012},
+                "o1": {"input": 0.015, "output": 0.06}
+            },
+            ChatProvider.LLAMA: {"input": 0.0, "output": 0.0},  # Free
+            ChatProvider.OPENROUTER: {"input": 0.001, "output": 0.002}  # Example costs
+        }
+        return costs.get(self.provider, {"input": 0.0, "output": 0.0})

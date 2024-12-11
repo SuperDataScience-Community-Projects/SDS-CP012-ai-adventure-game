@@ -40,6 +40,8 @@ if "game_active" not in st.session_state:
     st.session_state.game_active = False
 if "use_free_version" not in st.session_state:
     st.session_state.use_free_version = False
+if "turn_counter" not in st.session_state:
+    st.session_state.turn_counter = 0
 
 # Custom CSS
 st.markdown("""
@@ -75,7 +77,7 @@ with st.sidebar:
     """)
     
     # Add toggle for free version
-    use_free_version = st.toggle("Use Free Version (Llama)", value=st.session_state.use_free_version)
+    use_free_version = st.toggle("Use Free Version (Llama 3.3 405B)", value=st.session_state.use_free_version)
     st.session_state.use_free_version = use_free_version
     
     # Modify API key input section
@@ -108,8 +110,27 @@ with st.sidebar:
                 AIMessage(content=game_init["options"])
             ]
             st.session_state.game_active = True
+            
+            # Reset turn counter when starting new game
+            st.session_state.turn_counter = 0
     else:
         st.info("Please either enable the free version or enter your OpenAI API key to start the game.")
+
+    # Display turn counter in sidebar
+    if st.session_state.game_active:
+        st.metric("Turn", st.session_state.turn_counter)
+        
+        # Add token statistics
+        if hasattr(st.session_state.game_engine, "get_token_stats"):
+            stats = st.session_state.game_engine.get_token_stats()
+            st.write("### Token Usage")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Input Tokens", stats["input_tokens"])
+                st.metric("Output Tokens", stats["output_tokens"])
+            with col2:
+                st.metric("Total Tokens", stats["total_tokens"])
+                st.metric("Est. Cost ($)", stats["estimated_cost"])
 
 # Message display area
 message_container = st.container()
@@ -132,6 +153,9 @@ if st.session_state.game_active and "game_engine" in st.session_state:
         
         if submit and user_input:
             logging.debug(f"Processing turn with input: {user_input}")
+            
+            # Increment turn counter
+            st.session_state.turn_counter += 1
             
             # Add user message to UI
             st.session_state.messages.append(HumanMessage(content=user_input)) # type: ignore

@@ -6,6 +6,7 @@ from pathlib import Path
 import logging
 from .config import ChatConfig
 import json
+from langchain.callbacks import get_openai_callback
 
 class GameEngine:
     def __init__(self, config: ChatConfig):
@@ -19,6 +20,9 @@ class GameEngine:
         # Initialize chains
         self._setup_chains()
         
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+
     def _setup_chains(self):
         """Setup the various processing chains"""
         # Character options chain
@@ -124,20 +128,24 @@ class GameEngine:
             # Add user input to messages
             self.messages.append(HumanMessage(content=user_input))
 
-            # Use the new utility method
-            history = self._format_conversation_history(skip_system=True)
-                        
-            # Generate story continuation with history
-            story_text = self.story_chain.invoke({
-                "history": history,
-                "state_message": self.state_message,
-                "user_input": self.messages[-1].content
-            })
-            
-            # Extract the current state from the story text
-            current_state = self.state_chain.invoke({
-                "story_text": history + "\n\n" + story_text
-            })
+            # Track tokens using callback
+            with get_openai_callback() as cb:
+                # Generate story continuation with history
+                history = self._format_conversation_history(skip_system=True)
+                story_text = self.story_chain.invoke({
+                    "history": history,
+                    "state_message": self.state_message,
+                    "user_input": self.messages[-1].content
+                })
+                
+                # Extract the current state from the story text
+                current_state = self.state_chain.invoke({
+                    "story_text": history + "\n\n" + story_text
+                })
+
+                # Update token counts
+                self.total_input_tokens += cb.prompt_tokens
+                self.total_output_tokens += cb.completion_tokens
 
             #print(f"\n#########################\nCurrent state: {current_state}\n#########################\n")
             
@@ -159,6 +167,19 @@ class GameEngine:
         except Exception as e:
             logging.error(f"Error processing turn: {str(e)}", exc_info=True)
             raise
+
+    def get_token_stats(self) -> dict:
+        """Get token usage statistics"""
+        costs = self.config.get_token_costs()
+        input_cost = (self.total_input_tokens / 1000) * costs["input"]
+        output_cost = (self.total_output_tokens / 1000) * costs["output"]
+        
+        return {
+            "input_tokens": self.total_input_tokens,
+            "output_tokens": self.total_output_tokens,
+            "total_tokens": self.total_input_tokens + self.total_output_tokens,
+            "estimated_cost": round(input_cost + output_cost, 4)
+        }
 
     async def run_game_loop(self):
         """Main game loop (Terminal version)"""
