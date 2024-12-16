@@ -1,9 +1,9 @@
 # Environment files
-.env
 .ipynb_checkpoints
 .DS_Store
 .venv
 .idea
+.env
 
 # Project directories
 aiadventuregame/
@@ -18,4 +18,7 @@ test.ipynb
 
 # log files
 *.log
+
+# messages.json
+messages.json
 
